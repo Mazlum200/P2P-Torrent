@@ -15,6 +15,8 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import pyqtSlot
 import Client
 
+chunk_size = 1024
+
 
 
 class interfacer (threading.Thread):
@@ -25,12 +27,13 @@ class interfacer (threading.Thread):
 
     def run(self):
         while True:
+            #TODO: dosyalistesi, mesaj falan diye ayikla
             print("interfacequeue bekleniyor")
             s = Client.interfaceQueue.get()
             print("String = " + s)
-            fList = s.split(",")
+            fList = s.split(":")
             for x in fList:
-                self.ui.listWidget.addItem(x)
+                self.ui.listWidget.addItem(x.split(",")[0])
 
 
 
@@ -67,6 +70,8 @@ class Ui_MainWindow(object):
         self.listWidget = QtWidgets.QListWidget(self.centralwidget)
         self.listWidget.setGeometry(QtCore.QRect(490, 160, 256, 251))
         self.listWidget.setObjectName("listWidget")
+        self.listWidget.itemDoubleClicked.connect(Client.findFilemd5)
+        self.listWidget.itemDoubleClicked.connect(create_meta)
         self.textEdit.raise_()
         self.label.raise_()
         self.textEdit.raise_()
@@ -116,16 +121,36 @@ def create_fileList(path):
 
     #TODO : db'ye yazilacak
     #TODO: splash'e eklenecek
+    os.chdir(sys.path[0])
     with open('files.txt', 'w') as f:
-        os.chdir(sys.path[0]+ "/shared")
+        os.chdir(sys.path[0] +"/shared")
         for file in glob.glob("*.*"):
             filemd5 = md5(file)
-            f.write(file + "-" +  str(filemd5) + "\n")
-            print("File - md5 :" +str(filemd5) + file)
+            f.write(file + ":" +  str(filemd5) + ":" + str(os.stat(file).st_size) + "\n")
+            print("File - md5 - size:" + str(filemd5) + file + str(os.stat(file).st_size))
         f.close()
+
+def create_meta(item):
+    os.makedirs(os.path.dirname(sys.path[0] + "/tmp/meta.txt"), exist_ok=True)
+    os.chdir(sys.path[0] + "/tmp")
+    fmd5 = Client.files[item.text()][0]
+    fsize = Client.files[item.text()][1]
+    fname = item.text()
+    with open('meta.txt', 'a') as f:
+        os.chdir(sys.path[0] +"/tmp")
+        chunkstr = ""
+        for i in range(0, int(int(fsize) / chunk_size)):
+            chunkstr = chunkstr + str(i) + "/"
+        f.write(fmd5 + ":" +  fname + ":" + chunkstr)
+
+        print("File - md5 - size:" + str(fmd5) + fname + fsize)
+        f.close()
+    with open(fmd5 +".tmp", "wb") as out:
+        out.truncate(int(fsize))
 
 if __name__ == "__main__":
     import sys
+
     app = QtWidgets.QApplication(sys.argv)
     MainWindow = QtWidgets.QMainWindow()
     ui = Ui_MainWindow()
