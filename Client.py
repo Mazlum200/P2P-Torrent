@@ -6,6 +6,9 @@ import sqlite3
 from sqlite3 import Error
 from uuid import getnode as get_mac
 import glob, os
+
+import sys
+
 import mainwindow
 
 logQueue = Queue()
@@ -199,7 +202,7 @@ def findFile(fname):
             threadQueue.put("SEA " + fname)
 
 def search_file(fname):
-    os.chdir("/home/zula/PycharmProjects/p2p/shared")
+    os.chdir(sys.path[0] + "/shared")
     s = ""
     for file in glob.glob("*.txt"):
         print(file)

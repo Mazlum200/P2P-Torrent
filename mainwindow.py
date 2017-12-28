@@ -5,9 +5,12 @@
 # Created by: PyQt5 UI code generator 5.7
 #
 # WARNING! All changes made in this file will be lost!
+import glob
+import hashlib
 import threading
 from multiprocessing import Queue
 
+import os
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import pyqtSlot
 import Client
@@ -102,6 +105,25 @@ class Ui_MainWindow(object):
         MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
         self.connect.setText(_translate("MainWindow", "PushButton"))
 
+def md5(fname):
+    hash_md5 = hashlib.md5()
+    with open(fname, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
+
+def create_fileList(path):
+
+    #TODO : db'ye yazilacak
+    #TODO: splash'e eklenecek
+    with open('files.txt', 'w') as f:
+        os.chdir(sys.path[0]+ "/shared")
+        for file in glob.glob("*.*"):
+            filemd5 = md5(file)
+            f.write(file + "-" +  str(filemd5) + "\n")
+            print("File - md5 :" +str(filemd5) + file)
+        f.close()
+
 if __name__ == "__main__":
     import sys
     app = QtWidgets.QApplication(sys.argv)
@@ -109,6 +131,7 @@ if __name__ == "__main__":
     ui = Ui_MainWindow()
     ui.setupUi(MainWindow)
     MainWindow.show()
+    create_fileList("aaa")
     ct = Client.connectionThread()
     ct.start()
     interfaceThread = interfacer(ui)
