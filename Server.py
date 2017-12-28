@@ -101,8 +101,8 @@ class readerThread(threading.Thread):
             self.tQueue.put("SUCC")
         if cmd == "LSQ":
             s = ""
-            for key, value in peers.items():
-                s = str(key) + "," + str(value[0]) + "," + str(value[1]) + ":"
+            for key, value in peers.items() - 1:
+                s = s + str(key) + "," + str(value[0]) + "," + str(value[1]) + ":"
                 print(s)
             self.tQueue.put("LSA " + s)
 
@@ -116,7 +116,7 @@ lThread.start()
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 host = "0.0.0.0"
-port = 11119
+port = 11120
 s.bind((host, port))
 s.listen(5)
 

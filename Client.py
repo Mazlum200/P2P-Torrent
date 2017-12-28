@@ -108,11 +108,12 @@ class readerThread(threading.Thread):
             for x in pList:
                 pString = x.split(",")
                 uuid = pString[0]
-                ip = pString[1]
-                port = pString[2]
-                peers.setdefault(uuid, []).append(ip)
-                peers.setdefault(uuid, []).append(port)
-                print(peers)
+                if uuid:
+                    ip = pString[1]
+                    port = pString[2]
+                    peers.setdefault(uuid, []).append(ip)
+                    peers.setdefault(uuid, []).append(port)
+                    print(peers)
 
 def get_cList(ip, port):
     threadQueue = Queue()
