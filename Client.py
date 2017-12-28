@@ -6,6 +6,7 @@ import sqlite3
 from sqlite3 import Error
 from uuid import getnode as get_mac
 import glob, os
+from decimal import Decimal
 
 logQueue = Queue()
 writers = {}
@@ -122,12 +123,10 @@ class readerThread(threading.Thread):
             if ret:
                 self.tQueue.put("ASE " + ret)
 
-def get_cList(ip, port):
+def get_cList (ip, port):
     threadQueue = Queue()
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    print(ip + port)
     host = ip
-    port = int(port)
     s.connect_ex((host, port))
     print("Socket established with" + ip)
     rThread = readerThread(s, threadQueue, (ip, port))
@@ -135,7 +134,7 @@ def get_cList(ip, port):
     wThread = writeThread(s, threadQueue, (ip, port))
     wThread.start()
     threadQueue.put("USR " + str(get_mac()))
-    s.close()
+    #s.close()
 
 def findFile(fname):
     threadQueue = Queue()

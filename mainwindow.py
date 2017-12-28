@@ -29,13 +29,14 @@ class Ui_MainWindow(object):
         self.textEdit_2 = QtWidgets.QTextEdit(self.centralwidget)
         self.textEdit_2.setGeometry(QtCore.QRect(190, 200, 104, 70))
         self.textEdit_2.setObjectName("textEdit_2")
+        self.textEdit_2.setText("1")
         self.textEdit_3 = QtWidgets.QTextEdit(self.centralwidget)
         self.textEdit_3.setGeometry(QtCore.QRect(460, 30, 281, 51))
         self.textEdit_3.setObjectName("textEdit_3")
         self.connect = QtWidgets.QPushButton(self.centralwidget)
         self.connect.setGeometry(QtCore.QRect(220, 300, 84, 28))
         self.connect.setObjectName("connect")
-        self.connect.clicked.connect(self.on_click())
+        self.connect.clicked.connect(self.on_click)
         self.search = QtWidgets.QPushButton(self.centralwidget)
         self.search.setGeometry(QtCore.QRect(780, 40, 84, 28))
         self.search.setObjectName("search")
@@ -67,6 +68,7 @@ class Ui_MainWindow(object):
     def on_click(self):
         ip = self.textEdit.toPlainText()
         port = self.textEdit_2.toPlainText()
+        port = int(port)
         print(ip, port)
         Client.get_cList(ip, port)
 
@@ -78,7 +80,7 @@ class Ui_MainWindow(object):
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
-        self.pushButton.setText(_translate("MainWindow", "PushButton"))
+        self.connect.setText(_translate("MainWindow", "PushButton"))
 
 
 if __name__ == "__main__":
