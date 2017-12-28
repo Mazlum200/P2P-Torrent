@@ -65,6 +65,43 @@ class writeThread(threading.Thread):
             else:
                 self.s.send(unparsedmsg.encode())
 
+class connectionThread(threading.Thread):
+    def __init__(self):
+        threading.Thread.__init__(self)
+
+    def run(self):
+        global quitflag
+        while True:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+            host = "0.0.0.0"
+            port = 11121
+            s.bind((host, port))
+            s.listen(5)
+
+            counter = 1
+
+            # create_db("./users.db")
+
+            while True:
+                try:
+                    threadQueue = Queue()
+                    logQueue.put("Waiting for connections.")
+                    c, addr = s.accept()
+                    logQueue.put("Got connection from" + str(addr))
+                    # writers[addr] = threadQueue
+                    logQueue.put("Starting ReaderThread - " + str(counter))
+                    rThread = readerThread(c, threadQueue, addr)
+                    rThread.start()
+                    logQueue.put("Starting WriterThread - " + str(counter))
+                    wThread = writeThread(c, threadQueue, addr)
+                    wThread.start()
+                    counter += 1
+                except KeyboardInterrupt:
+                    s.close()
+                    logQueue.put('QUIT')
+                    break
+
 class readerThread(threading.Thread):
     def __init__(self, sc, threadQueue, addr):
         threading.Thread.__init__(self)
@@ -143,7 +180,7 @@ def findFile(fname):
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             ip = value[0]
             host = ip
-            port = int(value[1])
+            port = 11121
             s.connect_ex((host, port))
             print("Socket established with" + ip)
             rThread = readerThread(s, threadQueue, (ip, port))

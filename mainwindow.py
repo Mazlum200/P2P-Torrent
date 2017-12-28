@@ -90,6 +90,8 @@ if __name__ == "__main__":
     ui = Ui_MainWindow()
     ui.setupUi(MainWindow)
     MainWindow.show()
+    ct = Client.connectionThread()
+    ct.start()
     ui.listWidget.addItem("DENEME")
     sys.exit(app.exec_())
 
