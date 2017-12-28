@@ -6,9 +6,10 @@ import sqlite3
 from sqlite3 import Error
 from uuid import getnode as get_mac
 import glob, os
-from decimal import Decimal
+import mainwindow
 
 logQueue = Queue()
+interfaceQueue = Queue()
 writers = {}
 quitflag = 0
 peers = {}
@@ -36,8 +37,8 @@ class loggerThread (threading.Thread):
         print("Starting " + self.name)
         with open('logs.txt', 'a') as f:
             while True:
-                msg = self.lQueue.get()
-                if msg != "":
+               msg = self.lQueue.get()
+               if msg != "":
                     t = time.ctime()
                     msg = msg.strip()
                     log = str(t) + " : " + str(msg) + "\n"
@@ -159,6 +160,10 @@ class readerThread(threading.Thread):
             ret = search_file(fname)
             if ret:
                 self.tQueue.put("ASE " + ret)
+        if cmd == "ASE":
+            fString = msgList[0]
+            print("Fstring = " + fString)
+            interfaceQueue.put(fString)
 
 def get_cList (ip, port):
     threadQueue = Queue()
@@ -174,9 +179,13 @@ def get_cList (ip, port):
     #s.close()
 
 def findFile(fname):
-    threadQueue = Queue()
     for key, value in peers.items():
-        if key != get_mac():
+        print(key)
+        print(get_mac())
+        mac = get_mac()
+        print(key!=mac) #bunu arastir
+        if key != mac:
+            threadQueue = Queue()
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             ip = value[0]
             host = ip
@@ -187,10 +196,10 @@ def findFile(fname):
             rThread.start()
             wThread = writeThread(s, threadQueue, (ip, port))
             wThread.start()
-            threadQueue.put("SEA" + fname)
+            threadQueue.put("SEA " + fname)
 
 def search_file(fname):
-    os.chdir("/shared")
+    os.chdir("/home/zula/PycharmProjects/p2p/shared")
     s = ""
     for file in glob.glob("*.txt"):
         print(file)

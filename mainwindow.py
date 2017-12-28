@@ -5,10 +5,30 @@
 # Created by: PyQt5 UI code generator 5.7
 #
 # WARNING! All changes made in this file will be lost!
+import threading
+from multiprocessing import Queue
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import pyqtSlot
 import Client
+
+
+
+class interfacer (threading.Thread):
+
+    def __init__(self, ui):
+        threading.Thread.__init__(self)
+        self.ui = ui
+
+    def run(self):
+        while True:
+            print("interfacequeue bekleniyor")
+            s = Client.interfaceQueue.get()
+            print("String = " + s)
+            fList = s.split(",")
+            for x in fList:
+                self.ui.listWidget.addItem(x)
+
 
 
 class Ui_MainWindow(object):
@@ -82,7 +102,6 @@ class Ui_MainWindow(object):
         MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
         self.connect.setText(_translate("MainWindow", "PushButton"))
 
-
 if __name__ == "__main__":
     import sys
     app = QtWidgets.QApplication(sys.argv)
@@ -92,6 +111,7 @@ if __name__ == "__main__":
     MainWindow.show()
     ct = Client.connectionThread()
     ct.start()
-    ui.listWidget.addItem("DENEME")
+    interfaceThread = interfacer(ui)
+    interfaceThread.start()
     sys.exit(app.exec_())
 
