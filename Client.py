@@ -5,11 +5,13 @@ import time
 import sqlite3
 from sqlite3 import Error
 from uuid import getnode as get_mac
+import glob, os
 
 logQueue = Queue()
 writers = {}
 quitflag = 0
 peers = {}
+
 
 def create_db(db_file):
     """ create a database connection to a SQLite database """
@@ -114,6 +116,11 @@ class readerThread(threading.Thread):
                     peers.setdefault(uuid, []).append(ip)
                     peers.setdefault(uuid, []).append(port)
                     print(peers)
+        if cmd == "SEA":
+            fname = msgList[0]
+            ret = search_file(fname)
+            if ret:
+                self.tQueue.put("ASE " + ret)
 
 def get_cList(ip, port):
     threadQueue = Queue()
@@ -128,8 +135,34 @@ def get_cList(ip, port):
     wThread = writeThread(s, threadQueue, (ip, port))
     wThread.start()
     threadQueue.put("USR " + str(get_mac()))
+    s.close()
 
+def findFile(fname):
+    threadQueue = Queue()
+    for key, value in peers.items():
+        if key != get_mac():
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            ip = value[0]
+            host = ip
+            port = int(value[1])
+            s.connect_ex((host, port))
+            print("Socket established with" + ip)
+            rThread = readerThread(s, threadQueue, (ip, port))
+            rThread.start()
+            wThread = writeThread(s, threadQueue, (ip, port))
+            wThread.start()
+            threadQueue.put("SEA" + fname)
 
+def search_file(fname):
+    os.chdir("/shared")
+    s = ""
+    for file in glob.glob("*.txt"):
+        print(file)
+        s = s + file + ","
+    if s:
+        return s
+    else:
+        return 0
 
 
 lThread = loggerThread("Logger", logQueue)
