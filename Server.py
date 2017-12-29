@@ -27,9 +27,9 @@ def create_table(db_file):
     """ create a database connection to a SQLite database """
     try:
         conn = sqlite3.connect(db_file)
-        print(sqlite3.version)
-        with con:
-            cur = con.cursor()
+        #print(sqlite3.version)
+        with conn:
+            cur = conn.cursor()
             print("calıstım")
             cur.execute("CREATE TABLE [peers] ([peer_id] INTEGER  PRIMARY KEY NULL,[uuid] INTEGER NULL,[ip] TEXT  NULL,[port] INTEGER  NULL")
             control=False
@@ -40,9 +40,14 @@ def create_table(db_file):
 
 ###veri tabanına peer eklemek için
 def insert_peers(self,uuid,ip,port):
+    conn = sqlite3.connect(db_file)
+    #print(sqlite3.version)
+    cur = conn.cursor()
+    with conn:
+
         self.cur.execute("""INSERT INTO peers VALUES(NULL,?,?,?)""", (uuid,ip,port))
-        self.con.commit()
-        return "Suc"
+        self.conn.commit()
+        return "Succ"
 
 
 #########veri tabını boş mu dolu mu???
@@ -50,15 +55,15 @@ def control(db_file):
     try:
         conn = sqlite3.connect(db_file)
         cur = conn.cursor()
-        print(sqlite3.version)
+        #print(sqlite3.version)
         cur.execute("SELECT  *from peers ")
 
         data = cur.fetchall()
-        return len(data)
+        #return len(data)
         if len(data) >= 1:
-            return True
-        else:
             return False
+        else:
+            return True
 
     except Error as e:
         print(e)
@@ -285,7 +290,9 @@ counter = 1
 
 
 db_file = "./users.db"
-if control(db_file)==False:
+print("control",control(db_file))
+if control(db_file)==None:
+   print("çalıştım")
    create_table(db_file)
 
 
