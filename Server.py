@@ -8,17 +8,69 @@ from sqlite3 import Error
 logQueue = Queue()
 writers = {}
 quitflag = 0
+
 peers = {}
 
+###################
 def create_db(db_file):
     """ create a database connection to a SQLite database """
     try:
         conn = sqlite3.connect(db_file)
         print(sqlite3.version)
+
     except Error as e:
         print(e)
     finally:
         conn.close()
+
+def create_table(db_file):
+    """ create a database connection to a SQLite database """
+    try:
+        conn = sqlite3.connect(db_file)
+        print(sqlite3.version)
+        with con:
+            cur = con.cursor()
+            print("calıstım")
+            cur.execute("CREATE TABLE [peers] ([peer_id] INTEGER  PRIMARY KEY NULL,[uuid] INTEGER NULL,[ip] TEXT  NULL,[port] INTEGER  NULL")
+            control=False
+    except Error as e:
+        print(e)
+    finally:
+        conn.close()
+
+###veri tabanına peer eklemek için
+def insert_peers(self,uuid,ip,port):
+        self.cur.execute("""INSERT INTO peers VALUES(NULL,?,?,?)""", (uuid,ip,port))
+        self.con.commit()
+        return "Suc"
+
+
+#########veri tabını boş mu dolu mu???
+def control():
+        conn = sqlite3.connect(db_file)
+        cur = con.cursor()
+
+        cur.execute("SELECT  *from peers ")
+
+        data = cur.fetchall()
+        return len(data)
+        if len(data)>=1:
+            return True
+        else:
+            return False
+
+#########veri tabında daha önce eklenme varsa bunları peers dict yazacak server açılıp kapanınca peer listesi unutulmaın diye
+def egaliser_db(db_file):
+    conn = sqlite3.connect(db_file)
+    cur = con.cursor()
+
+    cur.execute("SELECT  *from peers  ")
+    data = cur.fetchall()
+    # print("len data", len(data))
+    size = len(data)
+    for i in range(size):
+        peers.setdefault(data[i][1], []).append(data[i][2])
+        peers.setdefault(data[i][1], []).append(data[i][3])
 
 
 class loggerThread (threading.Thread):
@@ -42,6 +94,9 @@ class loggerThread (threading.Thread):
                     if msg == "QUIT":
                         f.close()
                         break
+
+
+
 
 class writeThread(threading.Thread):
     def __init__(self, sc, writerQueue, addr):
@@ -109,6 +164,8 @@ class readerThread(threading.Thread):
             if uuid == self.uuid:
                 peers.setdefault(self.uuid, []).append(self.ip)
                 peers.setdefault(self.uuid, []).append(self.port)
+                #########veri tabanı ve peers listesi eşitlemeye çalışıyoruz
+                insert_peers(self.uuid,self.ip,self.port)
                 self.cpl.append([self.uid,self.ip,self.port])
                 print(self.cpl)
                 print(peers)
@@ -124,7 +181,7 @@ class readerThread(threading.Thread):
         if cmd == "PEERLİST":
             ###katyıtlı olmayanlara listeyi vermiyoruz.
             mylist=""
-            if(self.searchlist(self.uuid)):
+            if(self.searchlist(uuid)):
                 for item in self.cpl:
                     mylist += str(item[0]) + ":" + str(item[1]) + ":" + str(item[2]) +"\n"
             self.cSocket.send(("NLISTB\n" + mylist + "NLISTE").encode())
@@ -137,7 +194,7 @@ class readerThread(threading.Thread):
     ###listede olup olmadığın bakılıyor cpl alternatif
     def searchlist(uuid):
             #self.cplLock.acquire()
-
+            global flag
             for i in range(0, len(self.cpl)):
                if (self.cpl[i][0] == self.uuid and self.cpl[i][1] == self.ip and self.cpl[i][2] == self.port):
                     self.cpl[i][3] = time.ctime()
@@ -155,16 +212,16 @@ class readerThread(threading.Thread):
     ####if key not in self.fihrist.keys():  functionuda iş görüyor
     def searchlist__(uuid):
             #self.cplLock.acquire()
-
+            global flag1
             for key, value in list(peers.items()):
                if (key == self.uuid and value[0] == self.ip and value[1] == self.port):
                     #item[2] = time.ctime()
                     #self.cSocket.send(("TICOK " + item[2]).encode())
                     print("Listede var")
-                    flag=True
+                    flag1=True
                else:
-                    flag=False
-            return flag
+                    flag1=False
+            return flag1
             # self.cplLock.release()
 
 class TimeThread(threading.Thread):
@@ -183,11 +240,11 @@ class TimeThread(threading.Thread):
 
 
             for key, value in list(peers.items()):
-                if (str(value[0]) != self.ip or int(value[1]) != self.port):
+                if (str(value[0]) != self.ip or int(value[1])!= self.port):
                     try:
                         testSocket = socket.socket()
                         testSocket.settimeout(5)
-                        testSocket.connect(str(value[0]),int(value[1]))
+                        testSocket.connect((str(value[0]),int(value[1])))
                         testSocket.send("TIC".encode())
                         data = testSocket.recv(1024).decode()
                         if data[0:5] == "TOC":
@@ -218,10 +275,13 @@ s.bind((host, port))
 s.listen(5)
 cpl=[]
 counter = 1
-global flag
-flag=True
 
-create_db("./users.db")
+
+
+db_file = "./users.db"
+if control()==False:
+   create_table(db_file)
+
 
 while True:
     try:
@@ -230,7 +290,7 @@ while True:
         c, addr = s.accept()
         logQueue.put("Got connection from" + str(addr))
         #writers[addr] = threadQueue
-        time=TimeThread("TimeThread",+ str(counter))
+        time=TimeThread("TimeThread-",+ str(counter),host,port)
         time.start()
         logQueue.put("Starting ReaderThread - " + str(counter))
         rThread = readerThread(c, threadQueue, addr)
