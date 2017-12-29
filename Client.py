@@ -124,7 +124,7 @@ class writeThread(threading.Thread):
         global quitflag
         while True:
             unparsedmsg = self.wQueue.get()
-            #print(unparsedmsg)
+            print(unparsedmsg)
             if(unparsedmsg == "QUIT"):
                 logQueue.put("Exiting WriterThread - ")
                 self.s.close()
@@ -179,10 +179,9 @@ class connectionThread(threading.Thread):
                     break
 ####zamanı geçmiş olanları siliyoruz
 class TimeThread(threading.Thread):
-    def __init__(self, name, cplLock, ip, port):
+    def __init__(self, name, ip, port):
         threading.Thread.__init__(self)
         self.name = name
-        #self.cplLock = cplLock
         self.ip = ip
         self.port = port
 
@@ -202,6 +201,7 @@ class TimeThread(threading.Thread):
                         testSocket.send("TIC".encode())
                         data = testSocket.recv(1024).decode()
                         if data[0:5] == "TOC":
+                            print("TOCAGIRDIM")
                             pass
                         else:
                             delQueue.put((value[0], value[1]))

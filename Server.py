@@ -11,18 +11,6 @@ quitflag = 0
 
 peers = {}
 
-###################
-def create_db(db_file):
-    """ create a database connection to a SQLite database """
-    try:
-        conn = sqlite3.connect(db_file)
-        print(sqlite3.version)
-
-    except Error as e:
-        print(e)
-    finally:
-        conn.close()
-
 def create_table(db_file):
     """ create a database connection to a SQLite database """
     try:
@@ -136,7 +124,6 @@ class readerThread(threading.Thread):
         self.ip = addr[0]
         self.port = addr[1]
 
-        s=""
 
     def run(self):
         while True:
@@ -157,8 +144,9 @@ class readerThread(threading.Thread):
         msgList.pop(0)
         if cmd == "USR":
             uuid = msgList[0]
-            '''''
             self.uuid = uuid
+            '''''
+
             if searchlist__(uuid):
                 self.cSocket.send("TICVAR".encode())
                 #self.tQueue.put("TIC")
@@ -166,27 +154,31 @@ class readerThread(threading.Thread):
                 self.tQueue.put("TIC")
             '''''
             ###ya da
-            if self.uuid not in peers.keys():
-                self.tQueue.put("TIC")
+            self.tQueue.put("TIC")
+            #Burasi client'a tasinirsa eger daha onceden kayit edilmisse db den okuma yapilacak
+            #if self.uuid not in peers.keys():
+             #   pass
 
         if cmd == "TOC":
             #timer eklenecek
             uuid = msgList[0]
+            print(uuid == self.uuid)
             if uuid == self.uuid:
                 peers.setdefault(self.uuid, []).append(self.ip)
                 peers.setdefault(self.uuid, []).append(self.port)
-                #########veri tabanı ve peers listesi eşitlemeye çalışıyoruz
-                insert_peers(self.uuid,self.ip,self.port)
-                self.cpl.append([self.uid,self.ip,self.port])
-                print(self.cpl)
+                #########veri tabanı ve peers listesi eşitlemeye çalışıyoruz, client'a tasinip db den okuma yapilacak
+                #insert_peers(self.uuid,self.ip,self.port)
+                #self.cpl.append([self.uid,self.ip,self.port])
+                #print(self.cpl)
                 print(peers)
             self.tQueue.put("SUCC")
         if cmd == "LSQ":
-
+            s = ""
+            print(peers)
             for key, value in list(peers.items()):
-                s = self.s + str(key) + "," + str(value[0]) + "," + str(value[1]) + ":"
+                s = s + str(key) + "," + str(value[0]) + "," + str(value[1]) + ":"
                 print(s)
-            self.tQueue.put("LSA " + self.s)
+            self.tQueue.put("LSA " + s)
 
         ###lsq alternatif  cpl ile
         if cmd == "PEERLİST":
@@ -204,36 +196,36 @@ class readerThread(threading.Thread):
 
     ###listede olup olmadığın bakılıyor cpl alternatif
     def searchlist(uuid):
-            #self.cplLock.acquire()
-            global flag
-            for i in range(0, len(self.cpl)):
-               if (self.cpl[i][0] == self.uuid and self.cpl[i][1] == self.ip and self.cpl[i][2] == self.port):
-                    self.cpl[i][3] = time.ctime()
-                    #self.cSocket.send(("TICOK " + str(self.cpl[i][3])).encode())
-                    print("Listede var")
-                    flag=True
-               else:
-                    flag=False
-            return flag
-            # self.cplLock.release()
+        #self.cplLock.acquire()
+        global flag
+        for i in range(0, len(self.cpl)):
+            if (self.cpl[i][0] == self.uuid and self.cpl[i][1] == self.ip and self.cpl[i][2] == self.port):
+                self.cpl[i][3] = time.ctime()
+                #self.cSocket.send(("TICOK " + str(self.cpl[i][3])).encode())
+                print("Listede var")
+                flag=True
+            else:
+                flag=False
+        return flag
+        # self.cplLock.release()
     ###dictionary modeli
     #######
     ########3
     ##sadece uid ile arama yaparsak
     ####if key not in self.fihrist.keys():  functionuda iş görüyor
     def searchlist__(uuid):
-            #self.cplLock.acquire()
-            global flag1
-            for key, value in list(peers.items()):
-               if (key == self.uuid and value[0] == self.ip and value[1] == self.port):
-                    #item[2] = time.ctime()
-                    #self.cSocket.send(("TICOK " + item[2]).encode())
-                    print("Listede var")
-                    flag1=True
-               else:
-                    flag1=False
-            return flag1
-            # self.cplLock.release()
+        #self.cplLock.acquire()
+        global flag1
+        for key, value in list(peers.items()):
+            if (key == self.uuid and value[0] == self.ip and value[1] == self.port):
+                #item[2] = time.ctime()
+                #self.cSocket.send(("TICOK " + item[2]).encode())
+                print("Listede var")
+                flag1=True
+            else:
+                flag1=False
+        return flag1
+        # self.cplLock.release()
 
 class TimeThread(threading.Thread):
     def __init__(self, name, cplLock, ip, port):
@@ -281,7 +273,7 @@ lThread.start()
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 host = "0.0.0.0"
-port = 11120
+port = 11122
 s.bind((host, port))
 s.listen(5)
 cpl=[]
@@ -303,7 +295,7 @@ while True:
         c, addr = s.accept()
         logQueue.put("Got connection from" + str(addr))
         #writers[addr] = threadQueue
-        time=TimeThread("TimeThread-",+ str(counter),host,port)
+        time=TimeThread("TimeThread-", str(counter),host,port)
         time.start()
         logQueue.put("Starting ReaderThread - " + str(counter))
         rThread = readerThread(c, threadQueue, addr)

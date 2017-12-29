@@ -2,40 +2,11 @@
 
 # Form implementation generated from reading ui file 'untitled.ui'
 #
-# Created by: PyQt5 UI code generator 5.7
+# Created by: PyQt5 UI code generator 5.6
 #
 # WARNING! All changes made in this file will be lost!
-import glob
-import hashlib
-import threading
-from multiprocessing import Queue
 
-import os
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import pyqtSlot
-import Client
-
-chunk_size = 1024 * 1024
-
-
-
-class interfacer (threading.Thread):
-
-    def __init__(self, ui):
-        threading.Thread.__init__(self)
-        self.ui = ui
-
-    def run(self):
-        while True:
-            #TODO: dosyalistesi, mesaj falan diye ayikla
-            print("interfacequeue bekleniyor")
-            s = Client.interfaceQueue.get()
-            print("String = " + s)
-            fList = s.split(":")
-            for x in fList:
-                self.ui.listWidget.addItem(x.split(",")[0])
-
-
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -70,7 +41,6 @@ class Ui_MainWindow(object):
         self.connect = QtWidgets.QPushButton(self.centralwidget)
         self.connect.setGeometry(QtCore.QRect(120, 230, 80, 23))
         self.connect.setObjectName("connect")
-        self.connect.clicked.connect(self.on_click)
         self.horizontalLayoutWidget_3 = QtWidgets.QWidget(self.centralwidget)
         self.horizontalLayoutWidget_3.setGeometry(QtCore.QRect(460, 30, 160, 80))
         self.horizontalLayoutWidget_3.setObjectName("horizontalLayoutWidget_3")
@@ -86,7 +56,6 @@ class Ui_MainWindow(object):
         self.search = QtWidgets.QPushButton(self.centralwidget)
         self.search.setGeometry(QtCore.QRect(550, 130, 80, 23))
         self.search.setObjectName("search")
-        self.search.clicked.connect(self.search_file)
         self.horizontalLayoutWidget_4 = QtWidgets.QWidget(self.centralwidget)
         self.horizontalLayoutWidget_4.setGeometry(QtCore.QRect(340, 220, 401, 191))
         self.horizontalLayoutWidget_4.setObjectName("horizontalLayoutWidget_4")
@@ -98,8 +67,6 @@ class Ui_MainWindow(object):
         self.horizontalLayout_4.addWidget(self.label_4)
         self.listWidget = QtWidgets.QListWidget(self.horizontalLayoutWidget_4)
         self.listWidget.setObjectName("listWidget")
-        self.listWidget.itemDoubleClicked.connect(Client.findFilemd5)
-        self.listWidget.itemDoubleClicked.connect(create_meta)
         self.horizontalLayout_4.addWidget(self.listWidget)
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(MainWindow)
@@ -113,18 +80,6 @@ class Ui_MainWindow(object):
         self.retranslateUi(MainWindow)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
-    def on_click(self):
-        ip = self.textEdit.toPlainText()
-        port = self.textEdit_2.toPlainText()
-        port = int(port)
-        print(ip, port)
-        Client.get_cList(ip, port)
-
-    def search_file(self):
-        fname = self.textEdit_3.toPlainText()
-        print(fname)
-        Client.findFile(fname)
-
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
@@ -135,62 +90,13 @@ class Ui_MainWindow(object):
         self.search.setText(_translate("MainWindow", "Ara"))
         self.label_4.setText(_translate("MainWindow", "Dosya Listesi:"))
 
-def md5(fname):
-    hash_md5 = hashlib.md5()
-    with open(fname, "rb") as f:
-        for chunk in iter(lambda: f.read(4096), b""):
-            hash_md5.update(chunk)
-    return hash_md5.hexdigest()
-
-def create_fileList(path):
-
-    #TODO : db'ye yazilacak
-    #TODO: splash'e eklenecek
-    os.chdir(sys.path[0])
-    with open('files.txt', 'w') as f:
-        os.chdir(sys.path[0] +"/shared")
-        for file in glob.glob("*.*"):
-            filemd5 = md5(file)
-            f.write(file + ":" +  str(filemd5) + ":" + str(os.stat(file).st_size) + "\n")
-            print("File - md5 - size:" + str(filemd5) + file + str(os.stat(file).st_size))
-        f.close()
-
-def create_meta(item):
-    os.makedirs(os.path.dirname(sys.path[0] + "/tmp/meta.txt"), exist_ok=True)
-    os.chdir(sys.path[0] + "/tmp")
-    fmd5 = Client.files[item.text()][0]
-    fsize = Client.files[item.text()][1]
-    fname = item.text()
-    with open('meta.txt', 'a') as f:
-        os.chdir(sys.path[0] +"/tmp")
-        chunkstr = ""
-        if int(fsize) < chunk_size:
-            chunkstr = "-1"
-        else:
-            for i in range(0, int(int(fsize) / chunk_size)):
-                chunkstr = chunkstr + str(i) + "/"
-            chunkstr += chunkstr + str(int(fsize) % chunk_size)
-        f.write(fmd5 + ":" +  fname + ":" + chunkstr)
-
-        print("File - md5 - size:" + str(fmd5) + fname + fsize)
-        f.close()
-    with open(fmd5 +".tmp", "wb") as out:
-        out.truncate(int(fsize))
-        out.close()
 
 if __name__ == "__main__":
     import sys
-
     app = QtWidgets.QApplication(sys.argv)
     MainWindow = QtWidgets.QMainWindow()
     ui = Ui_MainWindow()
     ui.setupUi(MainWindow)
     MainWindow.show()
-    create_fileList("aaa")
-    Client.create_table("./users.db")
-    ct = Client.connectionThread()
-    ct.start()
-    interfaceThread = interfacer(ui)
-    interfaceThread.start()
     sys.exit(app.exec_())
 
