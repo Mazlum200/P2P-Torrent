@@ -46,18 +46,24 @@ def insert_peers(self,uuid,ip,port):
 
 
 #########veri tabını boş mu dolu mu???
-def control():
+def control(db_file):
+    try:
         conn = sqlite3.connect(db_file)
-        cur = con.cursor()
-
+        cur = conn.cursor()
+        print(sqlite3.version)
         cur.execute("SELECT  *from peers ")
 
         data = cur.fetchall()
         return len(data)
-        if len(data)>=1:
+        if len(data) >= 1:
             return True
         else:
             return False
+
+    except Error as e:
+        print(e)
+
+
 
 #########veri tabında daha önce eklenme varsa bunları peers dict yazacak server açılıp kapanınca peer listesi unutulmaın diye
 def egaliser_db(db_file):
@@ -279,7 +285,7 @@ counter = 1
 
 
 db_file = "./users.db"
-if control()==False:
+if control(db_file)==False:
    create_table(db_file)
 
 
