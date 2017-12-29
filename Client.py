@@ -22,6 +22,7 @@ peers = {}
 files = {}
 downloadings = {}
 chunk_size = 1024*1024
+fihrist = {}
 
 def create_db(db_file):
     """ create a database connection to a SQLite database """
@@ -160,14 +161,17 @@ class connectionThread(threading.Thread):
             while True:
                 try:
                     threadQueue = Queue()
+                    tQueue = queue.Queue()
                     logQueue.put("Waiting for connections.")
                     c, addr = s.accept()
                     logQueue.put("Got connection from" + str(addr))
                     # writers[addr] = threadQueue
                     time=TimeThread("Time thread-"+ str(counter),host,port)
                     time.start()
+                    msg = WriteMessageThread("Msg thread-" + str(counter), host, port,tQueue)
+                    msg.start()
                     logQueue.put("Starting ReaderThread - " + str(counter))
-                    rThread = readerThread(c, threadQueue, addr)
+                    rThread = readerThread(c, threadQueue, addr,tQueue)
                     rThread.start()
                     logQueue.put("Starting WriterThread - " + str(counter))
                     wThread = writeThread(c, threadQueue, addr)
@@ -217,13 +221,14 @@ class TimeThread(threading.Thread):
                         del peers[key]
                         break
 class readerThread(threading.Thread):
-    def __init__(self, sc, threadQueue, addr):
+    def __init__(self, sc, threadQueue, addr,tqueue):
         threading.Thread.__init__(self)
         self.s = sc
         self.uuid = ""
         self.tQueue = threadQueue
         self.ip = addr[0]
         self.port = addr[1]
+        self.tqueue=tqueue
 
     def run(self):
         while True:
@@ -247,6 +252,34 @@ class readerThread(threading.Thread):
             uuid = msgList[0]
             self.uuid = uuid
             self.tQueue.put("TIC")
+            self.fihrist[nickname] = self.tqueue
+        elif cmd == "SAY":
+
+            response = "SOK"
+            qq_msg = (None, None, response)
+            self.tqueue.put((qq_msg))
+            msg = data[4:]
+
+            for key in self.fihrist.keys():
+                qq_msg = (None, None, response)
+                self.fihrist[key].put((qq_msg))
+            return 0
+
+        elif cmd == "MSG":
+            msg = data[4:].split(':', 1)
+            nick = msg[0]
+            msg = msg[1]
+
+            if nick not in self.fihrist.keys():
+                response = "MNO " + nick
+
+            else:
+                q_msg = (nick, self.nickname, msg)
+                self.fihrist[nick].put(q_msg)
+                response = "MOK"
+            qq_msg = (response)
+            self.tqueue.put((qq_msg))
+            return 0
         if cmd == "TOC":
             #timer eklenecek
             peers.setdefault(self.uuid, []).append(self.ip)
@@ -322,6 +355,36 @@ class readerThread(threading.Thread):
             # print(md5)
             # print(chunk_no)
             # nbfile = file[2]
+class WriteMessageThread(threading.Thread):
+    def __init__(self, name, cSocket, address, threadQueue):
+        threading.Thread.__init__(self)
+        self.name = name
+        self.cSocket = cSocket
+        self.address = address
+
+        self.tQueue = threadQueue
+
+    def incoming_parser(self, data):
+        if data[0]:
+            going_msg = str("MSG " + data[1] + ":" + data[2])
+            self.cSocket.send(going_msg.encode())
+
+
+        elif data[1]:
+            going_msg = str("SAY " + data[1] + ":" + data[2])
+            self.cSocket.send(going_msg.encode())
+
+        else:
+            going_msg = str(data[-1])
+            self.cSocket.send(going_msg.encode())
+
+    def run(self):
+
+        print("Starting " + self.name)
+        while True:
+            if self.tQueue.qsize() > 0:
+                q_msg = self.tQueue.get()
+                self.incoming_parser(q_msg)
 
 def rename_and_move(md5):
     import shutil
