@@ -32,7 +32,65 @@ def create_db(db_file):
         print(e)
     finally:
         conn.close()
+def create_table(db_file):
+    """ create a database connection to a SQLite database """
+    try:
+        conn = sqlite3.connect(db_file)
+        #print(sqlite3.version)
+        with conn:
+            cur = conn.cursor()
+            print("calıstım")
+            cur.execute("CREATE TABLE [peers] ([peer_id] INTEGER  PRIMARY KEY NULL,[uuid] INTEGER NULL,[ip] TEXT  NULL,[port] INTEGER  NULL")
+            control=False
+    except Error as e:
+        print(e)
+    finally:
+        conn.close()
 
+###veri tabanına peer eklemek için
+def insert_peers(self,uuid,ip,port):
+    conn = sqlite3.connect(db_file)
+    #print(sqlite3.version)
+    cur = conn.cursor()
+    with conn:
+
+        self.cur.execute("""INSERT INTO peers VALUES(NULL,?,?,?)""", (uuid,ip,port))
+        self.conn.commit()
+        return "Succ"
+
+
+#########veri tabını boş mu dolu mu???
+def control(db_file):
+    try:
+        conn = sqlite3.connect(db_file)
+        cur = conn.cursor()
+        #print(sqlite3.version)
+        cur.execute("SELECT  *from peers ")
+
+        data = cur.fetchall()
+        #return len(data)
+        if len(data) >= 1:
+            return False
+        else:
+            return True
+
+    except Error as e:
+        print(e)
+
+
+
+#########veri tabında daha önce eklenme varsa bunları peers dict yazacak server açılıp kapanınca peer listesi unutulmaın diye
+def egaliser_db(db_file):
+    conn = sqlite3.connect(db_file)
+    cur = con.cursor()
+
+    cur.execute("SELECT  *from peers  ")
+    data = cur.fetchall()
+    # print("len data", len(data))
+    size = len(data)
+    for i in range(size):
+        peers.setdefault(data[i][1], []).append(data[i][2])
+        peers.setdefault(data[i][1], []).append(data[i][3])
 
 class loggerThread (threading.Thread):
 
@@ -92,8 +150,12 @@ class connectionThread(threading.Thread):
             s.listen(5)
 
             counter = 1
-
-            # create_db("./users.db")
+            db_file = "./users1.db"
+            print("control", control(db_file))
+            if control(db_file) == None:
+                #print("çalıştım")
+                create_table(db_file)
+            #create_db("./users1.db")
 
             while True:
                 try:
@@ -102,6 +164,8 @@ class connectionThread(threading.Thread):
                     c, addr = s.accept()
                     logQueue.put("Got connection from" + str(addr))
                     # writers[addr] = threadQueue
+                    time=TimeThread("Time thread-"+ str(counter),host,port)
+                    time.start()
                     logQueue.put("Starting ReaderThread - " + str(counter))
                     rThread = readerThread(c, threadQueue, addr)
                     rThread.start()
@@ -113,36 +177,45 @@ class connectionThread(threading.Thread):
                     s.close()
                     logQueue.put('QUIT')
                     break
-
-class downloaderThread(threading.Thread):
-    def __init__(self):
+####zamanı geçmiş olanları siliyoruz
+class TimeThread(threading.Thread):
+    def __init__(self, name, cplLock, ip, port):
         threading.Thread.__init__(self)
+        self.name = name
+        #self.cplLock = cplLock
+        self.ip = ip
+        self.port = port
 
     def run(self):
-        global quitflag
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        print("Starting " + self.name)
+        while True:
+            time.sleep(20)  # 20s just to test
+            delQueue = queue.Queue()
 
-        host = "0.0.0.0"
-        port = 11121
-        s.bind((host, port))
-        s.listen(5)
 
-        counter = 1
+            for key, value in list(peers.items()):
+                if (str(value[0]) != self.ip or int(value[1])!= self.port):
+                    try:
+                        testSocket = socket.socket()
+                        testSocket.settimeout(5)
+                        testSocket.connect((str(value[0]),int(value[1])))
+                        testSocket.send("TIC".encode())
+                        data = testSocket.recv(1024).decode()
+                        if data[0:5] == "TOC":
+                            pass
+                        else:
+                            delQueue.put((value[0], value[1]))
+                        testSocket.send("BYBY".encode())
 
-        # create_db("./users.db")
-        threadQueue = Queue()
-        logQueue.put("Waiting for connections.")
-        c, addr = s.accept()
-        logQueue.put("Got connection from" + str(addr))
-        # writers[addr] = threadQueue
-        logQueue.put("Starting ReaderThread - " + str(counter))
-        rThread = readerThread(c, threadQueue, addr)
-        rThread.start()
-        logQueue.put("Starting WriterThread - " + str(counter))
-        wThread = writeThread(c, threadQueue, addr)
-        wThread.start()
-        counter += 1
-
+                    except:
+                        delQueue.put(value[0], value[1])
+            while not delQueue.empty():
+                delIndex = delQueue.get()
+                for key, value in list(peers.items()):
+                    if (delIndex[0] == value[0] and int(delIndex[1]) == value[1]):
+                        print("siliyorum ",peers[key])
+                        del peers[key]
+                        break
 class readerThread(threading.Thread):
     def __init__(self, sc, threadQueue, addr):
         threading.Thread.__init__(self)
@@ -171,13 +244,15 @@ class readerThread(threading.Thread):
         #print(cmd)
         msgList.pop(0)
         if cmd == "USR":
-            uuid = msgList[0];
-            self.uuid = uuid;
-            self.tQueue.put("TIC");
+            uuid = msgList[0]
+            self.uuid = uuid
+            self.tQueue.put("TIC")
         if cmd == "TOC":
             #timer eklenecek
             peers.setdefault(self.uuid, []).append(self.ip)
             peers.setdefault(self.uuid, []).append(self.port)
+            #########veri tabanı ve peers listesi eşitlemeye çalışıyoruz
+            insert_peers(self.uuid, self.ip, self.port)
             #db'ye yaz
             #db'ye yaz
         if cmd == "TIC":
