@@ -15,7 +15,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import pyqtSlot
 import Client
 
-chunk_size = 1024
+chunk_size = 1024 * 1024
 
 
 
@@ -49,13 +49,14 @@ class Ui_MainWindow(object):
         self.textEdit = QtWidgets.QTextEdit(self.centralwidget)
         self.textEdit.setGeometry(QtCore.QRect(190, 100, 104, 70))
         self.textEdit.setObjectName("textEdit")
+        self.textEdit.setText("localhost")
         self.label_2 = QtWidgets.QLabel(self.centralwidget)
         self.label_2.setGeometry(QtCore.QRect(60, 220, 63, 20))
         self.label_2.setObjectName("label_2")
         self.textEdit_2 = QtWidgets.QTextEdit(self.centralwidget)
         self.textEdit_2.setGeometry(QtCore.QRect(190, 200, 104, 70))
         self.textEdit_2.setObjectName("textEdit_2")
-        self.textEdit_2.setText("1")
+        self.textEdit_2.setText("11120")
         self.textEdit_3 = QtWidgets.QTextEdit(self.centralwidget)
         self.textEdit_3.setGeometry(QtCore.QRect(460, 30, 281, 51))
         self.textEdit_3.setObjectName("textEdit_3")
@@ -70,8 +71,8 @@ class Ui_MainWindow(object):
         self.listWidget = QtWidgets.QListWidget(self.centralwidget)
         self.listWidget.setGeometry(QtCore.QRect(490, 160, 256, 251))
         self.listWidget.setObjectName("listWidget")
-        self.listWidget.itemDoubleClicked.connect(Client.findFilemd5)
         self.listWidget.itemDoubleClicked.connect(create_meta)
+        self.listWidget.itemDoubleClicked.connect(Client.findFilemd5)
         self.textEdit.raise_()
         self.label.raise_()
         self.textEdit.raise_()
@@ -139,14 +140,19 @@ def create_meta(item):
     with open('meta.txt', 'a') as f:
         os.chdir(sys.path[0] +"/tmp")
         chunkstr = ""
-        for i in range(0, int(int(fsize) / chunk_size)):
-            chunkstr = chunkstr + str(i) + "/"
+        if int(fsize) < chunk_size:
+            chunkstr = "-1"
+        else:
+            for i in range(0, int(int(fsize) / chunk_size)):
+                chunkstr = chunkstr + str(i) + "/"
+            chunkstr += chunkstr + str(int(fsize) % chunk_size)
         f.write(fmd5 + ":" +  fname + ":" + chunkstr)
 
         print("File - md5 - size:" + str(fmd5) + fname + fsize)
         f.close()
     with open(fmd5 +".tmp", "wb") as out:
         out.truncate(int(fsize))
+        out.close()
 
 if __name__ == "__main__":
     import sys

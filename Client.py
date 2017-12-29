@@ -6,7 +6,7 @@ import sqlite3
 from sqlite3 import Error
 from uuid import getnode as get_mac
 import glob, os
-
+from base64 import b64decode, b64encode
 import sys
 
 from PyQt5.QtCore import pyqtSlot
@@ -21,6 +21,7 @@ quitflag = 0
 peers = {}
 files = {}
 downloadings = {}
+chunk_size = 1024*1024
 
 def create_db(db_file):
     """ create a database connection to a SQLite database """
@@ -71,7 +72,10 @@ class writeThread(threading.Thread):
                 self.s.close()
                 return True
             else:
-                self.s.send(unparsedmsg.encode())
+                if isinstance(unparsedmsg, str):
+                    self.s.send(unparsedmsg.encode())
+                elif isinstance(unparsedmsg, bytes):
+                    self.s.send(unparsedmsg)
 
 class connectionThread(threading.Thread):
     def __init__(self):
@@ -110,6 +114,35 @@ class connectionThread(threading.Thread):
                     logQueue.put('QUIT')
                     break
 
+class downloaderThread(threading.Thread):
+    def __init__(self):
+        threading.Thread.__init__(self)
+
+    def run(self):
+        global quitflag
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        host = "0.0.0.0"
+        port = 11121
+        s.bind((host, port))
+        s.listen(5)
+
+        counter = 1
+
+        # create_db("./users.db")
+        threadQueue = Queue()
+        logQueue.put("Waiting for connections.")
+        c, addr = s.accept()
+        logQueue.put("Got connection from" + str(addr))
+        # writers[addr] = threadQueue
+        logQueue.put("Starting ReaderThread - " + str(counter))
+        rThread = readerThread(c, threadQueue, addr)
+        rThread.start()
+        logQueue.put("Starting WriterThread - " + str(counter))
+        wThread = writeThread(c, threadQueue, addr)
+        wThread.start()
+        counter += 1
+
 class readerThread(threading.Thread):
     def __init__(self, sc, threadQueue, addr):
         threading.Thread.__init__(self)
@@ -122,7 +155,7 @@ class readerThread(threading.Thread):
     def run(self):
         while True:
             unparsedmsg = self.s.recv(1024).decode()
-            #print(unparsedmsg)
+            print(unparsedmsg)
             parsedmsg = self.outgoingParser(unparsedmsg)
             if(parsedmsg == "QUI"):
                 logQueue.put("Exiting ReaderThread - " + str(self.number))
@@ -182,14 +215,51 @@ class readerThread(threading.Thread):
             #print(files)
             interfaceQueue.put(fString)
         if cmd == "SMD":
-            md5 = msgList[0]
-            ret = search_file_md5(md5)
-            if ret:
-                self.tQueue.put("VAR " + str(md5))
-            else:
-                self.tQueue.put("YOH")
+            tList = msgList[0].split(":")
+            md5 = tList[0]
+            chunks = tList[1]
+            self.tQueue.put("ALL " + md5 + "," + chunks)
+            for chunk_no in chunks.split("/"):
+                ret = search_file_md5(md5, chunk_no)
+                if ret:
+                    self.tQueue.put(ret)
+                else:
+                    self.tQueue.put("YOH")
+#            rename_and_move(md5)
         if cmd == "VAR":
-            downloadings[md5].append(self.ip)
+            md5 = msgList[0]
+            downloadings.setdefault(md5, []).append(self.ip)
+            print(downloadings)
+        # if cmd == "SND":
+        #     fthings = msgList.split(":")
+        #     md5 = fthings[0]
+        #     chunk_no = fthings[1]
+        #     ret = send_chunk(md5, chunk_no)
+
+        if cmd == "ALL":
+            file = msgList[0].split(",")
+            md5 = file[0]
+            chunks = file[1]
+            for i in range(0, len(chunks.split("/"))):
+                a = self.s.recv(1024*1024)
+                write_to_file(md5, i, a)
+            # print("File bilgileri:")
+            # print(md5)
+            # print(chunk_no)
+            # nbfile = file[2]
+
+def rename_and_move(md5):
+    import shutil
+    os.chdir(sys.path[0] + "/tmp")
+    with open("meta.txt", "r") as f:
+        for line in f:
+            list = line.split(":")
+            fmd5 = list[0]
+            fname = list[1]
+            if fmd5 == md5:
+                os.makedirs(os.path.dirname(sys.path[0] + "/downloaded/meta.txt"), exist_ok=True)
+                shutil.move(sys.path[0] + "/tmp/" + md5 +".tmp", sys.path[0] + "/downloaded/" + fname)
+        f.close()
 
 def get_cList (ip, port):
     threadQueue = Queue()
@@ -225,6 +295,26 @@ def findFile(fname):
             wThread.start()
             threadQueue.put("SEA " + fname)
 
+def write_to_file(md5, chunkno, bin):
+    #print("Dosyaya yaziliyor")
+    os.chdir(sys.path[0] + "/tmp")
+    with open(md5 + ".tmp", "wb") as f:
+        if int(chunkno) != -1:
+            f.seek(int(chunkno) * chunk_size)
+        #print(bin)
+        bin = b64encode(bin)
+        f.write(b64decode(bin))
+        f.close()
+
+def send_chunk(md5, chunkno):
+    ret = search_file_md5(md5)
+    os.chdir(sys.path[0] + "/shared")
+    with open(ret, 'rb') as f:
+        f.seek(chunkno*chunk_size)
+        chunk = f.read(chunk_size)
+        f.close()
+    return chunk.decode()
+
 def search_file(sname):
     # s = ""`
     # for file in glob.glob("*.txt"):
@@ -235,7 +325,7 @@ def search_file(sname):
     # else:
     #     return 0
     s = ""
-    os.chdir(sys.path[0] + "/shared")
+    os.chdir(sys.path[0])
     with open('files.txt', 'r') as f:
         for line in f:
             fcredentials = line.split(":")
@@ -243,6 +333,7 @@ def search_file(sname):
             fname = fcredentials[0].split(".")[0]
             fmd5 = fcredentials[1]
             fsize = fcredentials[2]
+            print(fname)
             if sname == fname:
                 s = s + fnameex + "," + fmd5 + "," + fsize + ":"
         f.close()
@@ -251,7 +342,7 @@ def search_file(sname):
     else:
         return 0
 
-def search_file_md5(md5):
+def search_file_md5(md5, chunk_no):
     # s = ""
     # for file in glob.glob("*.txt"):
     #     print(file)
@@ -261,21 +352,56 @@ def search_file_md5(md5):
     # else:
     #     return 0
     s = ""
-    os.chdir(sys.path[0] + "/shared")
+    os.chdir(sys.path[0])
+    fname = ""
+    ret = ""
     with open('files.txt', 'r') as f:
         for line in f:
             fcredentials = line.split(":")
             fnameex = fcredentials[0]
             fname = fcredentials[0].split(".")[0]
             fmd5 = fcredentials[1]
+            fsize = fcredentials[2]
+            print("File md5:" + fmd5)
+            print("Comparison md5 : " + md5)
+            print("Chunk no: " + chunk_no)
             if fmd5 == md5:
-                f.close()
-                return 1
+                os.chdir(sys.path[0] + "/shared")
+                print("Dosya okunuyor1")
+                with open(fnameex, 'rb') as fb:
+                    if int(chunk_no) == -1 :
+                        print("Dosya okunuyor")
+                        ret = fb.read(int(fsize))
+                    elif int(chunk_no) == -2 :
+                        fb.seek(int((int(fsize) / chunk_size)  * chunk_size))
+                        fb.read(int(fsize)%chunk_size)
+                    else:
+                        fb.seek(int(chunk_no)*chunk_size)
+                        ret = fb.read(chunk_size)
+                    if ret:
+                        print("Dosya okundu")
+                        fb.close()
+                        rename_and_move(fmd5)
+                        return ret
+                    else:
+                        print("Dosya okunamadi")
+                        fb.close()
+                        return 0
         f.close()
     return 0
 
 def findFilemd5(md5):
+    import random
+    os.chdir(sys.path[0] + "/tmp")
+    chunks = []
+    with open('meta.txt', 'r') as f:
+        for line in f:
+            fcredentials = line.split(":")
+            chunks = fcredentials[2]
+    print("Chunks: ")
+    print(chunks)
     for key, value in peers.items():
+        print(peers)
          # TODO: bunu arastir
         if key != get_mac():
             threadQueue = Queue()
@@ -283,13 +409,13 @@ def findFilemd5(md5):
             ip = value[0]
             host = ip
             port = 11121
-            #s.connect_ex((host, port))
+            s.connect_ex((host, port))
             print("Socket established with" + ip)
             rThread = readerThread(s, threadQueue, (ip, port))
             rThread.start()
             wThread = writeThread(s, threadQueue, (ip, port))
             wThread.start()
-            threadQueue.put("SMD " + files[md5.text()][0])
+            threadQueue.put("SMD " + files[md5.text()][0] + ":" + chunks)
 
 
 def start_download(md5):
