@@ -70,6 +70,8 @@ class readerThread(threading.Thread):
         self.ip = addr[0]
         self.port = addr[1]
 
+        s=""
+
     def run(self):
         while True:
             unparsedmsg = self.s.recv(1024).decode()
@@ -89,25 +91,120 @@ class readerThread(threading.Thread):
         msgList.pop(0)
         if cmd == "USR":
             uuid = msgList[0]
+            '''''
             self.uuid = uuid
-            self.tQueue.put("TIC")
+            if searchlist__(uuid):
+                self.cSocket.send("TICVAR".encode())
+                #self.tQueue.put("TIC")
+            else:
+                self.tQueue.put("TIC")
+            '''''
+            ###ya da
+            if self.uuid not in peers.keys():
+                self.tQueue.put("TIC")
+
         if cmd == "TOC":
             #timer eklenecek
             uuid = msgList[0]
             if uuid == self.uuid:
                 peers.setdefault(self.uuid, []).append(self.ip)
                 peers.setdefault(self.uuid, []).append(self.port)
+                self.cpl.append([self.uid,self.ip,self.port])
+                print(self.cpl)
                 print(peers)
             self.tQueue.put("SUCC")
         if cmd == "LSQ":
-            s = ""
-            for key, value in peers.items() - 1:
-                s = s + str(key) + "," + str(value[0]) + "," + str(value[1]) + ":"
+
+            for key, value in list(peers.items()):
+                s = self.s + str(key) + "," + str(value[0]) + "," + str(value[1]) + ":"
                 print(s)
-            self.tQueue.put("LSA " + s)
+            self.tQueue.put("LSA " + self.s)
+
+        ###lsq alternatif  cpl ile
+        if cmd == "PEERLİST":
+            ###katyıtlı olmayanlara listeyi vermiyoruz.
+            mylist=""
+            if(self.searchlist(self.uuid)):
+                for item in self.cpl:
+                    mylist += str(item[0]) + ":" + str(item[1]) + ":" + str(item[2]) +"\n"
+            self.cSocket.send(("NLISTB\n" + mylist + "NLISTE").encode())
+
+            self.tQueue.put("liste gönderiliyor")
+
+            return
 
 
+    ###listede olup olmadığın bakılıyor cpl alternatif
+    def searchlist(uuid):
+            #self.cplLock.acquire()
 
+            for i in range(0, len(self.cpl)):
+               if (self.cpl[i][0] == self.uuid and self.cpl[i][1] == self.ip and self.cpl[i][2] == self.port):
+                    self.cpl[i][3] = time.ctime()
+                    #self.cSocket.send(("TICOK " + str(self.cpl[i][3])).encode())
+                    print("Listede var")
+                    flag=True
+               else:
+                    flag=False
+            return flag
+            # self.cplLock.release()
+    ###dictionary modeli
+    #######
+    ########3
+    ##sadece uid ile arama yaparsak
+    ####if key not in self.fihrist.keys():  functionuda iş görüyor
+    def searchlist__(uuid):
+            #self.cplLock.acquire()
+
+            for key, value in list(peers.items()):
+               if (key == self.uuid and value[0] == self.ip and value[1] == self.port):
+                    #item[2] = time.ctime()
+                    #self.cSocket.send(("TICOK " + item[2]).encode())
+                    print("Listede var")
+                    flag=True
+               else:
+                    flag=False
+            return flag
+            # self.cplLock.release()
+
+class TimeThread(threading.Thread):
+    def __init__(self, name, cplLock, ip, port):
+        threading.Thread.__init__(self)
+        self.name = name
+        #self.cplLock = cplLock
+        self.ip = ip
+        self.port = port
+
+    def run(self):
+        print("Starting " + self.name)
+        while True:
+            time.sleep(20)  # 20s just to test
+            delQueue = queue.Queue()
+
+
+            for key, value in list(peers.items()):
+                if (str(value[0]) != self.ip or int(value[1]) != self.port):
+                    try:
+                        testSocket = socket.socket()
+                        testSocket.settimeout(5)
+                        testSocket.connect(str(value[0]),int(value[1]))
+                        testSocket.send("TIC".encode())
+                        data = testSocket.recv(1024).decode()
+                        if data[0:5] == "TOC":
+                            pass
+                        else:
+                            delQueue.put((value[0], value[1]))
+                        testSocket.send("BYBY".encode())
+
+                    except:
+                        delQueue.put(value[0], value[1])
+            while not delQueue.empty():
+                delIndex = delQueue.get()
+                for key, value in list(peers.items()):
+                    if (delIndex[0] == value[0] and int(delIndex[1]) == value[1]):
+                        print("siliyorum ",peers[key])
+                        del peers[key]
+                        break
 
 
 lThread = loggerThread("Logger", logQueue)
@@ -119,10 +216,12 @@ host = "0.0.0.0"
 port = 11120
 s.bind((host, port))
 s.listen(5)
-
+cpl=[]
 counter = 1
+global flag
+flag=True
 
-#create_db("./users.db")
+create_db("./users.db")
 
 while True:
     try:
@@ -131,6 +230,8 @@ while True:
         c, addr = s.accept()
         logQueue.put("Got connection from" + str(addr))
         #writers[addr] = threadQueue
+        time=TimeThread("TimeThread",+ str(counter))
+        time.start()
         logQueue.put("Starting ReaderThread - " + str(counter))
         rThread = readerThread(c, threadQueue, addr)
         rThread.start()
